@@ -13,7 +13,7 @@ import pandas as pd
 
 from suite2p import default_ops, run_s2p
 
-sys.path.append("~/Github/azure")
+sys.path.append("~/Github/process2p")
 
 # get and parse options
 def parse_args(argv, config_data):
@@ -87,7 +87,7 @@ def get_session_string_from_df(row):
     date_suffix = date_obj.strftime("%Y%m%d")
     return date_prefix + "-" + date_suffix
 
-f = open("config.json")
+f = open("../config.json")
 config_data = json.load(f)
 args_dict = parse_args(sys.argv, config_data)
 
