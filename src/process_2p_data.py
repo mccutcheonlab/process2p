@@ -13,9 +13,12 @@ import pandas as pd
 
 from suite2p import default_ops, run_s2p
 
-sys.path.append("~/Github/process2p")
+sys.path.append("~/Github/azure")
 
 # get and parse options
+def usage():
+    print('<python process_2p_data.py> -a <animals> -d <dates>')
+
 def parse_args(argv, config_data):
     args_dict = {}
     args_dict["metafile"] = False
@@ -28,17 +31,17 @@ def parse_args(argv, config_data):
     args_dict["get_data"] = False
     args_dict["get_behav_data"] = False
     args_dict["delete_intermediates"] = False
-    arg_help = "{} -a <animals> -d <dates>".format(argv[0])
+    args_dict["use_fast_dir"] = False
 
     try:
-        opts, args = getopt.getopt(argv[1:], "hmisogbXp:a:d:")
-    except:
-        print(arg_help)
+        opts, args = getopt.getopt(argv[1:], "hmisogbXfp:a:d:")
+    except getopt.GetoptError:
+        usage()
         sys.exit(2)
 
     for opt, arg in opts:
         if opt in ("-h", "--help"):
-            print(arg_help)
+            usage()
             sys.exit(2)
         elif opt in ("-m", "--get_metafile"):
             args_dict["metafile"] = True
@@ -57,6 +60,8 @@ def parse_args(argv, config_data):
             args_dict["project_dir"] = arg
         elif opt in ("-X", "--delete_intermediates"):
             args_dict["delete_intermediates"] = True
+        elif opt in ("-f", "--use_fast_dir"):
+            args_dict["use_fast_dir"] = True
         elif opt in ("-a", "--animals"):
             args_dict["animals"] = arg
         elif opt in ("-d", "--dates"):
@@ -92,11 +97,11 @@ config_data = json.load(f)
 args_dict = parse_args(sys.argv, config_data)
 
 if not os.path.isdir(args_dict["project_dir"]):
-    os.mkdir(args_dict["project_dir"])
+    os.makedirs(args_dict["project_dir"], exist_ok=True)
 
 logdir = os.path.join(args_dict["project_dir"], "log")
 if not os.path.isdir(logdir):
-    os.mkdir(logdir)
+    os.makedirs(logdir, exist_ok=True)
 
 ## setting up logger
 logfile = os.path.join(args_dict["project_dir"], "log", "{}.log".format(datetime.now().strftime('%Y-%m-%d_%H:%M:%S')))
@@ -161,7 +166,12 @@ else:
 logger.info("Analysing {} on {}".format(args_dict["animals"], args_dict["dates"]))
 
 # make directory structure
-path_root = args_dict["project_dir"]
+if args_dict["use_fast_dir"]:
+    logger.info("Using specified fast data disk. Will not save intermediates, only suite2p files.")
+    path_root = config_data["path_to_fast_dir"]
+else:
+    path_root = args_dict["project_dir"]
+
 path_raw = os.path.join(path_root, "rawdata")
 path_imaging = os.path.join(path_raw, "imaging")
 path_behav = os.path.join(path_raw, "behav")
@@ -174,15 +184,15 @@ if not os.path.isdir(path_root):
     sys.exit(2)
 
 if not os.path.isdir(path_raw):
-    os.mkdir(path_raw)
-    os.mkdir(path_imaging)
-    os.mkdir(path_behav)
+    os.makedirs(path_raw, exist_ok=True)
+    os.makedirs(path_imaging, exist_ok=True)
+    os.makedirs(path_behav, exist_ok=True)
     logger.info("Creating directories for raw data.")
 
 if not os.path.isdir(path_processed):
-    os.mkdir(path_processed)
-    os.mkdir(path_proc_ij)
-    os.mkdir(path_proc_s2p)
+    os.makedirs(path_processed, exist_ok=True)
+    os.makedirs(path_proc_ij, exist_ok=True)
+    os.makedirs(path_proc_s2p, exist_ok=True)
 
     logger.info("Creating directories for processed data.")
 
@@ -195,13 +205,15 @@ for animal in args_dict["animals"]:
     
     for path in [animal_imaging_path, animal_behav_path, animal_ij_path, animal_s2p_path]:
         if not os.path.isdir(path):
-            os.mkdir(path)
+            os.makedirs(path, exist_ok=True)
 
     for date in args_dict["dates"]:
         print("\n***********************************\n")
         logger.info("Now analysing {}, {}".format(animal, date))
         row = df[(df["animal"] == animal) & (df["date"] == date)]
-        
+
+        print(row)
+
         try:
             ses_path = get_session_string_from_df(row)
             day = str(row['day'].item()).zfill(3)
@@ -223,8 +235,8 @@ for animal in args_dict["animals"]:
         frame_file_remote = os.path.join(config_data["remote"], "bonsai", row["framefile"].item())
         frame_file_local = os.path.join(ses_behav_path, "sub-{}_ses-{}_frames.csv".format(animal, day))
 
-        lick_file_remote = os.path.join(config_data["remote"], "bonsai", row["licks"].item())
-        lick_file_local = os.path.join(ses_behav_path, "sub-{}_ses-{}_licks.csv".format(animal, day))       
+        # lick_file_remote = os.path.join(config_data["remote"], "bonsai", row["licks"].item())
+        # lick_file_local = os.path.join(ses_behav_path, "sub-{}_ses-{}_licks.csv".format(animal, day))       
 
         if os.path.isdir(ses_s2p_path):
             if not check_existing_files(ses_s2p_path, args_dict["overwrite"]):
@@ -233,7 +245,7 @@ for animal in args_dict["animals"]:
 
         for path in [ses_imaging_path, ses_behav_path, ses_ij_path, ses_s2p_path]:
             if not os.path.isdir(path):
-                 os.mkdir(path)
+                 os.makedirs(path, exist_ok=True)
 
         if args_dict["get_data"]:
             if not check_existing_files(ses_imaging_path, args_dict["overwrite"]):
@@ -242,6 +254,8 @@ for animal in args_dict["animals"]:
 
             logger.info("Downloading imaging data...")
             path_to_azcopy = config_data["path_to_azcopy"]
+
+            print("Trying this...", "{} cp {}.tif {}".format(path_to_azcopy, imaging_file_remote, imaging_file_local))
 
             subprocess.call("{} cp {}.tif {}".format(path_to_azcopy, imaging_file_remote, imaging_file_local), shell=True)
             if not os.path.exists(imaging_file_local):
@@ -282,12 +296,39 @@ for animal in args_dict["animals"]:
             ops["save_path0"] = ses_s2p_path
             ops["anatomical_only"] = 3
             ops["diameter"] = 15
-
-            run_s2p(ops=ops,db=db)
+            
+            try:
+                run_s2p(ops=ops,db=db)
+            except:
+                logger.warning("Suite2p has failed. Continuing to next session.")
+                shutil.rmtree(ses_ij_path)
+                subprocess.call("trash-empty", shell=True)
+                continue
 
             if args_dict["delete_intermediates"]:
                 logger.info("Delete intermediates selected so removing {}".format(ses_ij_path))
                 shutil.rmtree(ses_ij_path)
+
+            if args_dict["use_fast_dir"]:
+                path_proc_ses_permanent = os.path.join(args_dict["project_dir"],
+                                                    "processeddata",
+                                                    "proc_s2p",
+                                                    "sub-{}".format(animal),
+                                                    ses_path)
+                
+                print(path_proc_ses_permanent)
+
+                os.makedirs(path_proc_ses_permanent, exist_ok=True)
+
+                subprocess.call("cp {} {} -r".format(os.path.join(ses_s2p_path, "suite2p"),
+                                                path_proc_ses_permanent), shell=True)
+
+                logger.info("Removing files from fast disk {}")
+                shutil.rmtree(path_processed)
+                shutil.rmtree(path_raw)
+
+                logger.info("Emptying trash...")
+                subprocess.call("trash-empty", shell=True)
 
 logger.info("Emptying trash...")
 subprocess.call("trash-empty", shell=True)
