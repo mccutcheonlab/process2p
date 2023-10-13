@@ -237,9 +237,12 @@ for animal in args_dict["animals"]:
 
         # lick_file_remote = os.path.join(config_data["remote"], "bonsai", row["licks"].item())
         # lick_file_local = os.path.join(ses_behav_path, "sub-{}_ses-{}_licks.csv".format(animal, day))       
-
-        if os.path.isdir(ses_s2p_path):
-            if not check_existing_files(ses_s2p_path, args_dict["overwrite"]):
+        if args_dict["use_fast_dir"]:
+            final_ses_s2p_path = os.path.join(args_dict["project_dir"], "processeddata", "proc_s2p", "sub-{}".format(animal), ses_path)
+        else:
+            final_ses_s2p_path = ses_s2p_path
+        if os.path.isdir(final_ses_s2p_path):
+            if not check_existing_files(final_ses_s2p_path, args_dict["overwrite"]):
                 logger.info("Suite2p analysis files exist. If you want to re-analyze then either use the overwrite option or delete suite2p analysis files.")
                 continue
 
