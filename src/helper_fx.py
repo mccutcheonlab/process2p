@@ -9,7 +9,7 @@ import shutil
 
 import pandas as pd
 
-from suite2p import default_ops, run_s2p
+# from suite2p import default_ops, run_s2p
 
 # the base class used for most scripts in this package
 class Preprocess():
@@ -94,7 +94,11 @@ class Preprocess():
         os.makedirs(self.path_proc_ij, exist_ok=True)
         os.makedirs(self.path_proc_s2p, exist_ok=True)
         self.logger.info("Creating directories for processed data.")
-     
+
+  def define_multisession_paths(self):
+    print("defining multisession path")
+    
+
   def loop_animals(self, get_behav, get_data, do_imagej_zproject, do_suite2p):
     for self.animal in self.animals:
         self.define_animal_paths()
@@ -116,8 +120,8 @@ class Preprocess():
 
             self.define_session_paths()
 
-            if self.do_suite2p_files_exist():
-               continue
+            # if self.do_suite2p_files_exist():
+            #    continue
 
             self.make_session_dirs()
 
@@ -130,8 +134,8 @@ class Preprocess():
             if do_imagej_zproject:
                self.imagej_zproject()
 
-            if do_suite2p:
-               self.run_suite2p()
+            # if do_suite2p:
+            #    self.run_suite2p()
 
             if self.use_fast_dir:
                self.copy_from_fast_disk()
