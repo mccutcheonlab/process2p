@@ -54,8 +54,39 @@ def run_processing(config_file, get_metafile, animals, dates, use_fast_dir, over
     preprocess.define_root()
     preprocess.define_nwb_paths()
 
-    # Start looping through animals
-    preprocess.loop_animals(get_behav, get_data, imagej_z, suite2p)
+    for animal in preprocess.animals:
+        preprocess.define_animal_paths(animal)
+        for date in preprocess.dates:
+            print(f"{animal}, {date}")
+            if not preprocess.check_valid_combo(animal, date):
+                continue
+
+            # define paths and check if suite2p files already exist
+            preprocess.define_session_paths()
+            if preprocess.do_suite2p_files_exist():
+               continue
+            preprocess.make_session_dirs()
+               
+            if get_data:
+               preprocess.get_data()
+
+            if get_behav:
+               preprocess.get_behav()
+
+            if imagej_z:
+               preprocess.imagej_zproject()
+
+            # if do_suite2p:
+            #    self.run_suite2p()
+
+            if use_fast_dir:
+               preprocess.copy_from_fast_disk()
+
+            preprocess.logger.info("Emptying trash...")
+            try:
+                subprocess.call("trash-empty", shell=True)
+            except:
+                print("trash-empty command does not work on windows")
 
 if __name__ == "__main__":
     print("processing stuff")

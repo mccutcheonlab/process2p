@@ -75,7 +75,7 @@ class Preprocess():
     else:
         self.path_root = self.project_dir
 
-  def define_nwb_paths(self, fast_dir): 
+  def define_nwb_paths(self): 
     self.path_raw = self.path_root / "rawdata"
     self.path_imaging = self.path_raw / "imaging"
     self.path_behav = self.path_raw / "behav"
@@ -98,6 +98,26 @@ class Preprocess():
   def define_multisession_paths(self):
     print("defining multisession path")
     
+
+  def check_valid_combo(self, animal, date):
+    self.animal, self.date = animal, date
+    self.logger.info("Now analysing {}, {}".format(self.animal, self.date))
+    self.row = self.metadata.query("animal == @self.animal & date == @self.date")
+    if len(self.row) > 1:
+        self.logger.info(f"Too many values in metafile for {self.animal} on {self.date}")
+        return False
+    
+    try:
+        self.ses_path = get_session_string_from_df(self.row)
+        self.day = str(self.row['day'].item()).zfill(3)
+        return True
+    except:
+        self.logger.info(f"Cannot find matching values for {self.animal} on {self.date}")
+        return False
+
+    
+    
+
 
   def loop_animals(self, get_behav, get_data, do_imagej_zproject, do_suite2p):
     for self.animal in self.animals:
@@ -143,7 +163,8 @@ class Preprocess():
     self.logger.info("Emptying trash...")
     subprocess.call("trash-empty", shell=True)
 
-  def define_animal_paths(self):
+  def define_animal_paths(self, animal):
+    self.animal = animal
     self.animal_imaging_path = self.path_imaging / "sub-{}".format(self.animal)
     self.animal_behav_path = self.path_behav / "sub-{}".format(self.animal)
     self.animal_ij_path = self.path_proc_ij / "sub-{}".format(self.animal)
