@@ -1,3 +1,4 @@
 *.tif
 
 config.json
+*scratch.txt
