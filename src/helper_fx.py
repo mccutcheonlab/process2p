@@ -190,10 +190,11 @@ class Preprocess():
     self.logger.info("Downloading imaging data...")
     self.path_to_azcopy = self.config_data["path_to_azcopy"]
 
-    azcopy_command = "{} cp {}.tif {}".format(self.path_to_azcopy, self.imaging_file_remote, self.imaging_file_local)
-    self.logger.info(f"Trying this... {azcopy_command}")
+    # azcopy_command = '{} cp "{}.tif" "{}"'.format(self.path_to_azcopy, self.imaging_file_remote, self.imaging_file_local)
+    # self.logger.info(f"Trying this... {azcopy_command}")
+    subprocess.call("{} cp {}.tif {}".format(self.path_to_azcopy, self.imaging_file_remote, self.imaging_file_local), shell=True)
 
-    subprocess.call(azcopy_command, shell=True)
+    # subprocess.call(azcopy_command, shell=True)
     if not os.path.exists(self.imaging_file_local):
         self.logger.debug("Failed to get file using azcopy. Check azcopy log.")
 
