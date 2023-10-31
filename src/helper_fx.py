@@ -132,14 +132,14 @@ class Preprocess():
     self.ses_ij_path = self.animal_ij_path / self.ses_path
     self.ses_s2p_path = self.animal_s2p_path / self.ses_path
 
-    self.remote = Path(self.config_data["remote"])
-    self.imaging_file_remote = self.remote / self.row["folder"].item() / self.row["scanimagefile"].item()
+    self.remote = self.config_data["remote"]
+    self.imaging_file_remote = os.path.join(self.remote, self.row["folder"].item(), self.row["scanimagefile"].item())
     self.imaging_file_local = self.ses_imaging_path / f"sub-{self.animal}_ses-{self.day}_2p.tif"
 
-    self.event_file_remote = self.remote / "bonsai" / self.row["eventfile"].item()
+    self.event_file_remote = os.path.join(self.remote, "bonsai", self.row["eventfile"].item())
     self.event_file_local = self.ses_behav_path / f"sub-{self.animal}_ses-{self.day}_events.csv"
 
-    self.frame_file_remote = self.remote / "bonsai" / self.row["framefile"].item()
+    self.frame_file_remote = os.path.join(self.remote, "bonsai", self.row["framefile"].item())
     self.frame_file_local = self.ses_behav_path / f"sub-{self.animal}_ses-{self.day}_frames.csv"
 
     self.final_ses_s2p_path = self.project_dir / "processeddata" / "proc_s2p" / f"sub-{self.animal}" / f"ses-{self.day}"
@@ -189,12 +189,13 @@ class Preprocess():
 
     self.logger.info("Downloading imaging data...")
     self.path_to_azcopy = self.config_data["path_to_azcopy"]
+    print(self.imaging_file_remote)
 
-    # azcopy_command = '{} cp "{}.tif" "{}"'.format(self.path_to_azcopy, self.imaging_file_remote, self.imaging_file_local)
-    # self.logger.info(f"Trying this... {azcopy_command}")
-    subprocess.call("{} cp {}.tif {}".format(self.path_to_azcopy, self.imaging_file_remote, self.imaging_file_local), shell=True)
+    azcopy_command = '{} cp "{}.tif" "{}"'.format(self.path_to_azcopy, self.imaging_file_remote, self.imaging_file_local)
+    self.logger.info(f"Trying this... {azcopy_command}")
+    # subprocess.call("{} cp {}.tif {}".format(self.path_to_azcopy, self.imaging_file_remote, self.imaging_file_local), shell=True)
 
-    # subprocess.call(azcopy_command, shell=True)
+    subprocess.call(azcopy_command, shell=True)
     if not os.path.exists(self.imaging_file_local):
         self.logger.debug("Failed to get file using azcopy. Check azcopy log.")
 
