@@ -1,3 +1,10 @@
+*.pyc
 *.tif
 
 config.json
+for_testing/*
+for_testing_fast/*
+
+*scratch.txt
+
+scripts/.ipynb_checkpoints/*
