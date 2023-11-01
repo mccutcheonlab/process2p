@@ -7,9 +7,12 @@ from datetime import datetime
 import logging
 import shutil
 
+import numpy as np
 import pandas as pd
 
-# from suite2p import default_ops, run_s2p
+import imageio
+
+from suite2p import default_ops, run_s2p
 
 # the base class used for most scripts in this package
 class Preprocess():
@@ -199,20 +202,20 @@ class Preprocess():
     if not os.path.exists(self.imaging_file_local):
         self.logger.debug("Failed to get file using azcopy. Check azcopy log.")
 
+  def prep_for_s2p(self):
+     # get path to image
+
+     # load image
+     im = imageio.imread(self.imaging_file_local)
+
+     # adjust for remainder
+     im = remove_leftover_frames(im)
+
+     # process_in_chunks
+     process_in_chunks(im, self.ses_ij_path)
+
   def imagej_zproject(self):
-    if not self.check_existing_files(self.ses_ij_path):
-        return
-    self.logger.info("Processing with ImageJ...")
-    self.path_to_imagej = self.config_data["path_to_imagej"]
-    proj = self.config_data["imagej_settings"]["projection"]
-    z = self.config_data["imagej_settings"]["zplanes"]
-    chunks = self.config_data["imagej_settings"]["framesperchunk"]
-
-    subprocess.call(f"{self.path_to_imagej} -macro split_2p_tiff.ijm '{self.imaging_file_local}, {self.ses_ij_path}, {proj}, {chunks}, {z}' -batch ", shell=True)
-
-    if self.delete_intermediates:
-        self.logger.info("Delete intermediates selected so removing {}".format(self.ses_imaging_path))
-        shutil.rmtree(self.ses_imaging_path)
+    print("Processing with imageJ is deprecated. Use older version of process2p to use this option. Use prep_for_s2p instead.")
 
   def run_suite2p(self):
     if not self.check_existing_files(self.ses_s2p_path):
@@ -220,10 +223,11 @@ class Preprocess():
     self.logger.info("Processing with suite2p...")
     db = {'data_path': [self.ses_ij_path]}
     ops = default_ops()
-    ops["save_path0"] = self.ses_s2p_path
+    ops["save_path0"] = str(self.ses_s2p_path)
     ops["anatomical_only"] = 3
-    ops["diameter"] = 15
-            
+    ops["diameter"] = 20
+    ops["reg_tif"] = True
+
     try:
         run_s2p(ops=ops,db=db)
     except:
@@ -306,3 +310,45 @@ def setup_logger(project_dir):
     logger.info("Created log file at {}".format(logfile))
 
     return logger
+
+def process_in_chunks(im, savefilepath, chunk_size=1800):
+    
+    if chunk_size % 3 != 0:
+        print("chunk_size must be divisible by 3. Exiting.")
+        return
+    
+    print(f"Processing with chunk_size={chunk_size}")
+    
+    print(len(im))
+    # Calculate the number of chunks
+    num_chunks = len(im) // chunk_size + (len(im) % chunk_size > 0)
+    print(num_chunks)
+    
+    for i in range(num_chunks):
+        start = i * chunk_size
+        end = (i + 1) * chunk_size
+        chunk = im[start:end,:,:]
+
+        im2save = np.max(reshape_array(chunk), axis=1)
+        print(im2save.shape)
+        
+        output_filename = f"{savefilepath}/chunk_{i}.tif"
+        imageio.mimwrite(output_filename, im2save, format='TIFF')
+        
+    print("Finished saving chunks")
+
+def remove_leftover_frames(im, zplanes=3):
+    rem = im.shape[0] % zplanes
+
+    if rem > 0:
+        return im[:-rem,:,:]
+    else:
+        return im
+
+def reshape_array(im, zplanes=3):
+    nframes, y, x = im.shape
+    im = im.reshape(((int(nframes / zplanes)), -1, y, x))
+    
+    return im
+
+reshape_array
