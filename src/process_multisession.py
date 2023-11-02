@@ -17,7 +17,8 @@ from helper_fx import Preprocess, setup_logger
 @click.option("--overwrite", type=bool, is_flag=True, help="Choose if you want the option to overwrite files")
 @click.option("--delete_intermediates", "-X", type=bool, is_flag=True, help="When selected, will delete raw data and imageJ files")
 @click.option("--verbose", "-v", type=bool, is_flag=True, help="When selected, will print out debugging details")
-def run_processing(config_file, get_metafile, animals, dates, use_fast_dir, overwrite, delete_intermediates, verbose):
+@click.option("--keep-on-fast-dir", "-k", type=bool, is_flag=True, help="When selected, will not delete files from fast dir")
+def run_processing(config_file, get_metafile, animals, dates, use_fast_dir, overwrite, delete_intermediates, verbose, keep_on_fast_dir):
 
     # finds and opens config file
     print(f"The config file is {config_file}")
@@ -29,7 +30,8 @@ def run_processing(config_file, get_metafile, animals, dates, use_fast_dir, over
                             use_fast_dir,
                             overwrite,
                             delete_intermediates,
-                            verbose)
+                            verbose,
+                            keep_on_fast_dir)
     
     preprocess.set_multisession()
 

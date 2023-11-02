@@ -18,13 +18,14 @@ from suite2p import default_ops, run_s2p
 # the base class used for most scripts in this package
 class Preprocess():
   
-  def __init__(self, config_data, use_fast_dir, overwrite, delete_intermediates, verbose):
+  def __init__(self, config_data, use_fast_dir, overwrite, delete_intermediates, verbose, keep_on_fast_dir):
     self.config_data = config_data
     self.use_fast_dir = use_fast_dir
     self.overwrite = overwrite
     self.delete_intermediates = delete_intermediates
     self.verbose = verbose
     self.multisession = False
+    self.keep = keep_on_fast_dir
     print("class initialized")
 
   def set_multisession(self):
@@ -170,6 +171,8 @@ class Preprocess():
     self.path_multisession = self.path_multi_root / "-".join(self.days)
     self.path_multi_raw = self.path_multisession / "rawdata"
     self.path_multi_processed = self.path_multisession / "processeddata"
+    
+    self.final_ses_s2p_path = self.project_dir / "multisession" / "self.animal" / "-".join(self.days)
 
     self.logger.info("Dates valid. Continuing with analysis")
     print(self.path_multisession)
@@ -294,8 +297,9 @@ class Preprocess():
         run_s2p(ops=ops,db=db)
     except:
         self.logger.warning("Suite2p has failed. Continuing to next session.")
-        shutil.rmtree(self.ses_ij_path)
-        subprocess.call("trash-empty", shell=True)
+        if not self.keep:
+           shutil.rmtree(self.ses_ij_path)
+           subprocess.call("trash-empty", shell=True)
         return
     
     if self.delete_intermediates:
@@ -308,12 +312,13 @@ class Preprocess():
     subprocess.call("cp {} {} -r".format(self.ses_s2p_path / "suite2p",
                                          self.final_ses_s2p_path), shell=True)
 
-    self.logger.info("Removing files from fast disk {}")
-    shutil.rmtree(self.path_processed)
-    shutil.rmtree(self.path_raw)
+    if not self.keep:
+        self.logger.info("Removing files from fast disk {}")
+        shutil.rmtree(self.path_processed)
+        shutil.rmtree(self.path_raw)
 
-    self.logger.info("Emptying trash...")
-    subprocess.call("trash-empty", shell=True)
+        self.logger.info("Emptying trash...")
+        subprocess.call("trash-empty", shell=True)
 
 def get_session_string_from_df(row):
     day = str(int(row['day'].item())).zfill(3)
@@ -413,4 +418,3 @@ def reshape_array(im, zplanes=3):
     
     return im
 
-reshape_array
