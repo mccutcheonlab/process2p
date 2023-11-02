@@ -22,7 +22,8 @@ from helper_fx import Preprocess, setup_logger
 @click.option("--imagej-z", "-i", type=bool, is_flag=True, help="Processes with image j and does z projection")
 @click.option("--do-suite2p", "-s", type=bool, is_flag=True, help="Runs suite2p on processed tifs")
 @click.option("--delete_intermediates", "-X", type=bool, is_flag=True, help="When selected, will delete raw data and imageJ files")
-def run_processing(config_file, get_metafile, animals, dates, use_fast_dir, overwrite, get_behav, get_data, prep_for_s2p, imagej_z, do_suite2p, delete_intermediates):
+@click.option("--verbose", "-v", type=bool, is_flag=True, help="When selected, will print out debugging details")
+def run_processing(config_file, get_metafile, animals, dates, use_fast_dir, overwrite, get_behav, get_data, prep_for_s2p, imagej_z, do_suite2p, delete_intermediates, verbose):
 
     # finds and opens config file
     print(f"The config file is {config_file}")
@@ -30,7 +31,7 @@ def run_processing(config_file, get_metafile, animals, dates, use_fast_dir, over
     config_data = json.load(f)
 
     # Initializes class
-    preprocess = Preprocess(config_data, use_fast_dir, overwrite, delete_intermediates)
+    preprocess = Preprocess(config_data, use_fast_dir, overwrite, delete_intermediates, verbose)
 
     # Sets project_dir (and create if does not exist)
     preprocess.set_project_dir()

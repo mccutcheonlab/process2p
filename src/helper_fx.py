@@ -6,6 +6,7 @@ from pathlib import Path
 from datetime import datetime
 import logging
 import shutil
+import csv
 
 import numpy as np
 import pandas as pd
@@ -17,12 +18,17 @@ from suite2p import default_ops, run_s2p
 # the base class used for most scripts in this package
 class Preprocess():
   
-  def __init__(self, config_data, use_fast_dir, overwrite, delete_intermediates):
+  def __init__(self, config_data, use_fast_dir, overwrite, delete_intermediates, verbose):
     self.config_data = config_data
     self.use_fast_dir = use_fast_dir
     self.overwrite = overwrite
     self.delete_intermediates = delete_intermediates
+    self.verbose = verbose
+    self.multisession = False
     print("class initialized")
+
+  def set_multisession(self):
+     self.multisession = True
 
   def set_project_dir(self):
     self.project_dir = Path(self.config_data["path_to_project_dir"])
@@ -77,7 +83,10 @@ class Preprocess():
         self.path_root = Path(self.config_data["path_to_fast_dir"])
     else:
         self.path_root = self.project_dir
-
+    
+    if self.multisession:
+       self.path_multi = self.path_root / "multisession"
+     
   def define_nwb_paths(self): 
     self.path_raw = self.path_root / "rawdata"
     self.path_imaging = self.path_raw / "imaging"
@@ -97,11 +106,7 @@ class Preprocess():
         os.makedirs(self.path_proc_ij, exist_ok=True)
         os.makedirs(self.path_proc_s2p, exist_ok=True)
         self.logger.info("Creating directories for processed data.")
-
-  def define_multisession_paths(self):
-    print("defining multisession path")
-    
-
+  
   def check_valid_combo(self, animal, date):
     self.animal, self.date = animal, date
     self.logger.info("Now analysing {}, {}".format(self.animal, self.date))
@@ -147,6 +152,30 @@ class Preprocess():
 
     self.final_ses_s2p_path = self.project_dir / "processeddata" / "proc_s2p" / f"sub-{self.animal}" / f"ses-{self.day}"
 
+  def define_multisession_paths(self):
+    self.animal = self.animals[0]
+    self.path_multi_root = self.path_multi / self.animal
+
+    print(self.path_multi_root)
+
+    self.days = ["ses"]
+    for date in self.dates:
+        print(f"{self.animal}, {date}")
+        if not self.check_valid_combo(self.animal, date):
+            return False
+        else:
+           row = self.metadata.query("animal == @self.animal & date == @date")
+           self.days.append(str(row['day'].item()).zfill(3))
+    
+    self.path_multisession = self.path_multi_root / "-".join(self.days)
+    self.path_multi_raw = self.path_multisession / "rawdata"
+    self.path_multi_processed = self.path_multisession / "processeddata"
+
+    self.logger.info("Dates valid. Continuing with analysis")
+    print(self.path_multisession)
+
+    return True
+  
   def do_suite2p_files_exist(self):
     if os.path.isdir(self.final_ses_s2p_path):
         if not self.check_existing_files(self.final_ses_s2p_path):
@@ -173,7 +202,12 @@ class Preprocess():
         return True
 
   def make_session_dirs(self):
-    for path in [self.ses_imaging_path, self.ses_behav_path, self.ses_ij_path, self.ses_s2p_path]:
+    if not self.multisession:
+       paths_to_make = [self.ses_imaging_path, self.ses_behav_path, self.ses_ij_path, self.ses_s2p_path]
+    else:
+       paths_to_make = [self.path_root, self.path_multi_root, self.path_multisession, self.path_multi_raw, self.path_multi_processed]
+
+    for path in paths_to_make:
         if not os.path.isdir(path):
             os.makedirs(path, exist_ok=True)
 
@@ -185,10 +219,10 @@ class Preprocess():
     # subprocess.call("{} cp {} {}".format(path_to_azcopy, frame_file_remote, frame_file_local), shell=True)
     # subprocess.call("{} cp {} {}".format(path_to_azcopy, lick_file_remote, lick_file_local), shell=True)
 
-  
   def get_data(self):
-    if not self.check_existing_files(self.ses_imaging_path):
-        return
+    if not self.multisession:
+        if not self.check_existing_files(self.ses_imaging_path):
+            return
 
     self.logger.info("Downloading imaging data...")
     self.path_to_azcopy = self.config_data["path_to_azcopy"]
@@ -196,31 +230,59 @@ class Preprocess():
 
     azcopy_command = '{} cp "{}.tif" "{}"'.format(self.path_to_azcopy, self.imaging_file_remote, self.imaging_file_local)
     self.logger.info(f"Trying this... {azcopy_command}")
-    # subprocess.call("{} cp {}.tif {}".format(self.path_to_azcopy, self.imaging_file_remote, self.imaging_file_local), shell=True)
 
     subprocess.call(azcopy_command, shell=True)
     if not os.path.exists(self.imaging_file_local):
         self.logger.debug("Failed to get file using azcopy. Check azcopy log.")
 
+  def get_multi_data(self):
+     
+    self.remote = self.config_data["remote"]
+    self.ses_imaging_path = self.path_multi_raw
+    for date in self.dates:
+        row = self.metadata.query("animal == @self.animal & date == @date")
+        day = str(row['day'].item()).zfill(3)
+        self.imaging_file_remote = os.path.join(self.remote, row["folder"].item(), row["scanimagefile"].item())
+        self.imaging_file_local = self.ses_imaging_path / f"sub-{self.animal}_ses-{day}_2p.tif"
+
+        self.get_data()
+
   def prep_for_s2p(self):
-     # get path to image
+     
+    if not self.multisession:
+        im = imageio.imread(self.imaging_file_local)
+        im = remove_leftover_frames(im)
+        process_in_chunks(im, self.ses_ij_path)
+    else:
+        nframes_to_csv = []
+        tiffs = [f for f in self.path_multi_raw.iterdir() if f.is_file()]
+        for tiff in tiffs:
+           im = imageio.imread(tiff)
+           print(im.shape)
+           im = remove_leftover_frames(im)
+           nframes_to_csv.append(str(int(im.shape[0] / 3)))
+           process_in_chunks(im, self.path_multi_processed, file_prefix=tiff.name)
 
-     # load image
-     im = imageio.imread(self.imaging_file_local)
+        print(nframes_to_csv)
 
-     # adjust for remainder
-     im = remove_leftover_frames(im)
-
-     # process_in_chunks
-     process_in_chunks(im, self.ses_ij_path)
+        with open(self.path_multi_processed / "frames_per_tiff.csv", mode='w', newline='') as file:
+            writer = csv.writer(file)
+            writer.writerows(nframes_to_csv)
 
   def imagej_zproject(self):
     print("Processing with imageJ is deprecated. Use older version of process2p to use this option. Use prep_for_s2p instead.")
 
   def run_suite2p(self):
-    if not self.check_existing_files(self.ses_s2p_path):
-        return
+    if not self.multisession:
+        if not self.check_existing_files(self.ses_s2p_path):
+            return
+
     self.logger.info("Processing with suite2p...")
+
+    if self.multisession:
+       self.ses_s2p_path = self.path_multi_processed
+       self.ses_ij_path = self.path_multi_processed
+
     db = {'data_path': [self.ses_ij_path]}
     ops = default_ops()
     ops["save_path0"] = str(self.ses_s2p_path)
@@ -311,7 +373,7 @@ def setup_logger(project_dir):
 
     return logger
 
-def process_in_chunks(im, savefilepath, chunk_size=1800):
+def process_in_chunks(im, savefilepath, chunk_size=1800, file_prefix=""):
     
     if chunk_size % 3 != 0:
         print("chunk_size must be divisible by 3. Exiting.")
@@ -332,7 +394,7 @@ def process_in_chunks(im, savefilepath, chunk_size=1800):
         im2save = np.max(reshape_array(chunk), axis=1)
         print(im2save.shape)
         
-        output_filename = f"{savefilepath}/chunk_{i}.tif"
+        output_filename = f"{savefilepath}/{file_prefix}_chunk_{i}.tif"
         imageio.mimwrite(output_filename, im2save, format='TIFF')
         
     print("Finished saving chunks")
