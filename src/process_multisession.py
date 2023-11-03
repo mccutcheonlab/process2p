@@ -75,6 +75,8 @@ def run_processing(config_file, get_metafile, animals, dates, use_fast_dir, over
     preprocess.prep_for_s2p()
 
     preprocess.run_suite2p()
+    
+    preprocess.copy_from_fast_disk()
 
     # need to figure out copying to final destination
 

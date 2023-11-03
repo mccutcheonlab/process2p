@@ -172,7 +172,7 @@ class Preprocess():
     self.path_multi_raw = self.path_multisession / "rawdata"
     self.path_multi_processed = self.path_multisession / "processeddata"
     
-    self.final_ses_s2p_path = self.project_dir / "multisession" / "self.animal" / "-".join(self.days)
+    self.final_ses_s2p_path = self.project_dir / "multisession" / self.animal / "-".join(self.days)
 
     self.logger.info("Dates valid. Continuing with analysis")
     print(self.path_multisession)
@@ -314,8 +314,17 @@ class Preprocess():
 
     if not self.keep:
         self.logger.info("Removing files from fast disk {}")
-        shutil.rmtree(self.path_processed)
-        shutil.rmtree(self.path_raw)
+        try:
+            shutil.rmtree(self.path_processed)
+        except: pass
+        
+        try:
+            shutil.rmtree(self.path_raw)
+        except: pass
+        
+        try:
+            shutil.rmtree(self.path_multi)
+        except: pass
 
         self.logger.info("Emptying trash...")
         subprocess.call("trash-empty", shell=True)
